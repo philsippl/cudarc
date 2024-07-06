@@ -1,6 +1,6 @@
 use super::sys::SafeCommPtr;
 use super::{result, sys};
-use crate::driver::{CudaDevice, CudaSlice};
+use crate::driver::{CudaDevice, CudaSlice, CudaView};
 use std::mem::MaybeUninit;
 use std::ptr;
 use std::sync::Mutex;
@@ -234,6 +234,41 @@ impl Comm {
         unsafe {
             result::recv(
                 buff.cu_device_ptr as *mut _,
+                buff.len,
+                T::as_nccl_type(),
+                peer,
+                self.comm.0,
+                self.device.stream as *mut _,
+            )
+        }
+    }
+
+    pub fn send_view<T: NcclType>(
+        &self,
+        data: &CudaView<T>,
+        peer: i32,
+    ) -> Result<(), result::NcclError> {
+        unsafe {
+            result::send(
+                data.ptr as *mut _,
+                data.len,
+                T::as_nccl_type(),
+                peer,
+                self.comm.0,
+                self.device.stream as *mut _,
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn recv_view<T: NcclType>(
+        &self,
+        buff: &mut CudaView<T>,
+        peer: i32,
+    ) -> Result<result::NcclStatus, result::NcclError> {
+        unsafe {
+            result::recv(
+                buff.ptr as *mut _,
                 buff.len,
                 T::as_nccl_type(),
                 peer,
