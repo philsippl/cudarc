@@ -93,3 +93,36 @@ pub mod nccl;
 pub mod nvrtc;
 
 pub mod types;
+
+pub(crate) fn panic_no_lib_found<S: std::fmt::Debug>(lib_name: &str, choices: &[S]) -> ! {
+    panic!("Unable to dynamically load the \"{lib_name}\" shared library - searched for library names: {choices:?}. Ensure that `LD_LIBRARY_PATH` has the correct path to the installed library. If the shared library is present on the system under a different name than one of those listed above, please open a GitHub issue.");
+}
+
+pub(crate) fn get_lib_name_candidates(lib_name: &str) -> std::vec::Vec<std::string::String> {
+    let pointer_width = if cfg!(target_pointer_width = "32") {
+        "32"
+    } else if cfg!(target_pointer_width = "64") {
+        "64"
+    } else {
+        panic!("Unsupported target pointer width")
+    };
+
+    let major = env!("CUDA_MAJOR_VERSION");
+    let minor = env!("CUDA_MINOR_VERSION");
+
+    [
+        lib_name.into(),
+        std::format!("{lib_name}{pointer_width}"),
+        std::format!("{lib_name}{pointer_width}_{major}"),
+        std::format!("{lib_name}{pointer_width}_{major}{minor}"),
+        std::format!("{lib_name}{pointer_width}_{major}{minor}_0"),
+        std::format!("{lib_name}{pointer_width}_{major}0_{minor}"),
+        // See issue #242
+        std::format!("{lib_name}{pointer_width}_10"),
+        // See issue #246
+        std::format!("{lib_name}{pointer_width}_{major}0_0"),
+        // See issue #260
+        std::format!("{lib_name}{pointer_width}_9"),
+    ]
+    .into()
+}
