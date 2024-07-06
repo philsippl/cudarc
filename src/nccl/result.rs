@@ -26,6 +26,12 @@ impl sys::ncclResult_t {
     pub fn result(self) -> Result<NcclStatus, NcclError> {
         match self {
             sys::ncclResult_t::ncclSuccess => Ok(NcclStatus::Success),
+            #[cfg(not(any(
+                feature = "cuda-11040",
+                feature = "cuda-11050",
+                feature = "cuda-11060",
+                feature = "cuda-11070"
+            )))]
             sys::ncclResult_t::ncclInProgress => Ok(NcclStatus::InProgress),
             sys::ncclResult_t::ncclNumResults => Ok(NcclStatus::NumResults),
             _ => Err(NcclError(self)),
@@ -36,6 +42,12 @@ impl sys::ncclResult_t {
 /// See [cuda docs](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/api/comms.html?c.ncclCommFinalize)
 /// # Safety
 /// User is in charge of sending valid pointers.
+#[cfg(not(any(
+    feature = "cuda-11040",
+    feature = "cuda-11050",
+    feature = "cuda-11060",
+    feature = "cuda-11070"
+)))]
 pub unsafe fn comm_finalize(comm: sys::ncclComm_t) -> Result<NcclStatus, NcclError> {
     lib().ncclCommFinalize(comm).result()
 }
@@ -75,6 +87,12 @@ pub fn get_uniqueid() -> Result<sys::ncclUniqueId, NcclError> {
 /// See [cuda docs](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/api/comms.html?ncclcomminitrankconfig)
 /// # Safety
 /// User is in charge of sending valid pointers.
+#[cfg(not(any(
+    feature = "cuda-11040",
+    feature = "cuda-11050",
+    feature = "cuda-11060",
+    feature = "cuda-11070"
+)))]
 pub unsafe fn comm_init_rank_config(
     comm: *mut sys::ncclComm_t,
     nranks: ::core::ffi::c_int,
@@ -111,6 +129,7 @@ pub unsafe fn comm_init_all(
 }
 
 /// See [cuda docs](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/api/comms.html?ncclcommsplit)
+/// **Only available in 12.2+.
 /// # Safety
 /// User is in charge of sending valid pointers.
 // pub unsafe fn comm_split(
@@ -309,6 +328,8 @@ pub fn group_start() -> Result<NcclStatus, NcclError> {
 mod tests {
     use super::*;
     use crate::driver::CudaDevice;
+    #[cfg(feature = "no-std")]
+    use no_std_compat::{vec, vec::Vec};
     use std::ffi::c_void;
 
     #[test]
@@ -365,7 +386,6 @@ mod tests {
         let comm_id = get_uniqueid().unwrap();
         let threads: Vec<_> = (0..n_devices)
             .map(|i| {
-                let n_devices = n_devices.clone();
                 std::thread::spawn(move || {
                     let dev = CudaDevice::new(i).unwrap();
                     let sendslice = dev.htod_copy(vec![(i + 1) as f32 * 1.0; n]).unwrap();

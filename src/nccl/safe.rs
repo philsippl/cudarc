@@ -394,6 +394,8 @@ macro_rules! group {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "no-std")]
+    use no_std_compat::println;
 
     #[test]
     fn test_all_reduce() {
